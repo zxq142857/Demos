@@ -3,7 +3,7 @@
     <div class="pick-type-button">
       <div ref="cityPicker" style="position:relative;">
         <div class="initial-address">{{chooseList[0].name}}</div>
-        <input type="text" id="city-picker" class="address-picker elliptical" @click="chooseList[0].name = ''">
+        <input type="text" id="city-picker" class="address-picker elliptical" @click="chooseList[0].name = '';hasTimer = false">
       </div>
       <div @click="showPickList('workType')">{{ workType }}</div>
       <div @click="showPickList('issueDate')">{{ issueDate }}</div>
@@ -91,35 +91,6 @@ export default {
     issueDatePickHandle (value) {
       this.issueDate = value
       this.$refs.issueDate.style.animationName = 'wrapper-gradient-hide'
-    },
-    showCurrentAddress () {
-      // if ($('#start_place_id').val() != '') {
-      //   $('#start').attr('data-code', $('#start_place_id').val());
-      //   var citydatacodes = $('#start_place_id').val();
-      //   var str = citydatacodes.substring(2);
-      //   $('#start').attr('data-codes', citydatacodes.replace(str, '0000') + ',' + $('#start_place_id').val());
-      //   //加载已认证的默认城市
-      //   var cityvalue = [];
-      //   var codes = $('#start').attr('data-code');   //如130100
-      //   var str = codes.replace(codes.substring(2), '0000'); //如130000
-      //   var raw = $.rawCitiesData;
-      //   for (var i = 0; i < raw.length; i++) {
-      //     if (str == raw[i].code) {
-      //       cityvalue.push(raw[i].name);
-      //       console.log(raw[i].name);
-      //       for (var j = 0; j < raw[i].sub.length; j++) {
-      //         if (raw[i].sub[j].code === codes) {
-      //           console.log(raw[i].sub[j].name);
-      //           cityvalue.push(raw[i].sub[j].name);
-      //           console.log(cityvalue);
-      //           $('#start').val(cityvalue);
-      //           return;
-      //           // sub(raw[i].sub[j].name);
-      //         }
-      //       }
-      //     }
-      //   }
-      // }
     }
   },
   watch: {
