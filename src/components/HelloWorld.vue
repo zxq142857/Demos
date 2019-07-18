@@ -92,6 +92,7 @@ export default {
       this.issueDate = value
       this.$refs.issueDate.style.animationName = 'wrapper-gradient-hide'
     }
+
   },
   watch: {
     // eslint-disable-next-line
