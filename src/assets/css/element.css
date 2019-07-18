@@ -1,0 +1,25 @@
+.el-radio__input.is-checked .el-radio__inner {
+  border-color: #ff6a00 !important;
+  background: #ff6a00 !important;
+}
+.el-cascader-node.is-selectable.in-active-path {
+  color: #ff6a00 !important;
+}
+.el-cascader-node.in-active-path,
+.el-cascader-node.is-active,
+.el-cascader-node.is-selectable.in-checked-path {
+  color: #ff6a00 !important;
+}
+.el-checkbox__input.is-checked .el-checkbox__inner,
+.el-checkbox__input.is-indeterminate .el-checkbox__inner {
+  border-color: #ff6a00 !important;
+  background: #ff6a00 !important;
+}
+.el-cascader .el-input .el-input__inner:focus,
+.el-cascader .el-input.is-focus .el-input__inner {
+  border-color: rgba(255, 106, 0, 0.5) !important;
+}
+.el-input__inner {
+  height: 32px;
+  line-height: 32px;
+}
