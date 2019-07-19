@@ -3,7 +3,7 @@
     <div class="pick-type-button">
       <div ref="cityPicker" style="position:relative;">
         <div class="initial-address">{{chooseList[0].name}}</div>
-        <input type="text" id="city-picker" class="address-picker elliptical" @click="chooseList[0].name = '';hasTimer = false">
+        <input type="text" id="city-picker" class="address-picker elliptical" :style="{'opacity':chooseList[0].name.length === 0?'1':'0'}" @click="showCityPicker">
       </div>
       <div @click="showPickList('workType')">{{ workType }}</div>
       <div @click="showPickList('issueDate')">{{ issueDate }}</div>
@@ -85,21 +85,41 @@ export default {
       this.currentPicker = pickType
     },
     workTypePickHandle (value) {
-      this.workType = value
+      this.workType = value === '不限' ? '所有工作类型' : value
       this.$refs.workType.style.animationName = 'wrapper-gradient-hide'
     },
     issueDatePickHandle (value) {
-      this.issueDate = value
+      this.issueDate = value === '不限' ? '所有发布时间' : value
       this.$refs.issueDate.style.animationName = 'wrapper-gradient-hide'
-    }
+    },
+    showCityPicker () {
+      this.chooseList[0].name = ''
+      this.hasTimer = false
+      setTimeout(() => {
+        this.addUnlimitedAddress()
+      }, 100)
+    },
+    addUnlimitedAddress () {
+      let unlimited = `<div class="unlimited">不限</div>`
+      // eslint-disable-next-line
+      $('.weui-picker-container .toolbar-inner').append(unlimited)
+      // eslint-disable-next-line
+      $('.weui-picker-container .toolbar-inner .unlimited').on('click', () => {
+        this.address = null
+        this.chooseList[0].name = '所有工作地'
 
+        // eslint-disable-next-line
+        $('.weui-picker-container .toolbar-inner .close-picker').trigger('click')
+      })
+    }
   },
   watch: {
+    // 在（所有工作地）时，就会触发
     // eslint-disable-next-line
     address(newValue,oldValue) {
       // 如果已经有定时器了，就返回
       if (this.hasTimer) return
-      // 即将开启定时器，设置定时器为hasTimer为true
+      // 即将开启一个定时器，设置定时器为hasTimer为true
       this.hasTimer = true
       // 开启定时器，每0.1秒检测picker是否关闭
       let timer = setInterval(() => {
