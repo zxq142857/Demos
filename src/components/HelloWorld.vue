@@ -10,39 +10,43 @@
     </div>
     <div class="picker">
       <div class="work-type">
-        <ul class="pick-list" ref="workType">
-          <li @click="workTypePickHandle('不限')">
-            不限<span v-show="workType == '不限'">√</span>
-          </li>
-          <li @click="workTypePickHandle('实习')">
-            实习<span v-show="workType == '实习'">√</span>
-          </li>
-          <li @click="workTypePickHandle('兼职')">
-            兼职<span v-show="workType == '兼职'">√</span>
-          </li>
-          <li @click="workTypePickHandle('全职')">
-            全职<span v-show="workType == '全职'">√</span>
-          </li>
-        </ul>
+        <transition name="work-type">
+          <ul class="pick-list" ref="workType" v-if="currentPicker === 'workType'">
+            <li @click="workTypePickHandle('不限')">
+              不限<span v-show="workType == '所有工作类型'">√</span>
+            </li>
+            <li @click="workTypePickHandle('实习')">
+              实习<span v-show="workType == '实习'">√</span>
+            </li>
+            <li @click="workTypePickHandle('兼职')">
+              兼职<span v-show="workType == '兼职'">√</span>
+            </li>
+            <li @click="workTypePickHandle('全职')">
+              全职<span v-show="workType == '全职'">√</span>
+            </li>
+          </ul>
+        </transition>
       </div>
       <div class="issue-date">
-        <ul class="pick-list" ref="issueDate">
-          <li @click="issueDatePickHandle('不限')">
-            不限<span v-show="issueDate == '不限'">√</span>
-          </li>
-          <li @click="issueDatePickHandle('3天')">
-            3天<span v-show="issueDate == '3天'">√</span>
-          </li>
-          <li @click="issueDatePickHandle('7天')">
-            7天<span v-show="issueDate == '7天'">√</span>
-          </li>
-          <li @click="issueDatePickHandle('14天')">
-            14天<span v-show="issueDate == '14天'">√</span>
-          </li>
-          <li @click="issueDatePickHandle('30天')">
-            30天<span v-show="issueDate == '30天'">√</span>
-          </li>
-        </ul>
+        <transition name="issue-date">
+          <ul class="pick-list" ref="issueDate" v-if="currentPicker === 'issueDate'">
+            <li @click="issueDatePickHandle('不限')">
+              不限<span v-show="issueDate == '所有发布时间'">√</span>
+            </li>
+            <li @click="issueDatePickHandle('3天')">
+              3天<span v-show="issueDate == '3天'">√</span>
+            </li>
+            <li @click="issueDatePickHandle('7天')">
+              7天<span v-show="issueDate == '7天'">√</span>
+            </li>
+            <li @click="issueDatePickHandle('14天')">
+              14天<span v-show="issueDate == '14天'">√</span>
+            </li>
+            <li @click="issueDatePickHandle('30天')">
+              30天<span v-show="issueDate == '30天'">√</span>
+            </li>
+          </ul>
+        </transition>
       </div>
     </div>
   </div>
@@ -55,7 +59,7 @@ export default {
     return {
       address: '',
       hasTimer: false,
-      currentPicker: 'workType',
+      currentPicker: '',
       workType: '所有工作类型',
       issueDate: '所有发布时间',
       chooseList: [
@@ -79,16 +83,15 @@ export default {
   },
   methods: {
     showPickList (pickType) {
-      this.$refs[this.currentPicker].style.display = 'none'
-      this.$refs[pickType].style.animationName = 'wrapper-gradient'
-      this.$refs[pickType].style.display = 'block'
       this.currentPicker = pickType
     },
     workTypePickHandle (value) {
+      this.currentPicker = ''
       this.workType = value === '不限' ? '所有工作类型' : value
       this.$refs.workType.style.animationName = 'wrapper-gradient-hide'
     },
     issueDatePickHandle (value) {
+      this.currentPicker = ''
       this.issueDate = value === '不限' ? '所有发布时间' : value
       this.$refs.issueDate.style.animationName = 'wrapper-gradient-hide'
     },
@@ -170,11 +173,7 @@ li {
   overflow: hidden;
   width: 100%;
   .pick-list {
-    animation-name: initialize-wrapper;
-    animation-duration: 0.6s;
-    animation-timing-function: ease;
     animation-fill-mode: forwards;
-    overflow: hidden;
   }
 }
 .picker {
@@ -215,5 +214,18 @@ li {
 }
 .initial-address {
   position: absolute;
+}
+
+.work-type-enter-active {
+  animation: wrapper-gradient .5s ease;
+}
+.work-type-leave-active {
+  animation: wrapper-gradient-hid .5s ease;
+}
+.issue-date-enter-active {
+  animation: wrapper-gradient .5s ease;
+}
+.issue-date-leave-active {
+  animation: wrapper-gradient-hide .1s ease;
 }
 </style>
