@@ -3,9 +3,11 @@ import App from './App.vue'
 import router from './router'
 import store from './store'
 import './registerServiceWorker'
-
+import 'animate.css'
 import $ from 'jquery'
+import Tools from './assets/js/tools'
 Vue.prototype.$jQuery = $
+Vue.prototype.$Tools = Tools
 
 Vue.config.productionTip = false
 

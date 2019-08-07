@@ -3,6 +3,7 @@ module.exports = {
   // https://cli.vuejs.org/guide/webpack.html#simple-configuration
   configureWebpack: {
     externals: {
+      swiper: 'Swiper',
       jquery: '$'
     }
   }
