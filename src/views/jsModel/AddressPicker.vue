@@ -1,5 +1,5 @@
 <template>
-  <div class="hello-world">
+  <div ref="addressPicker" class="addressPicker">
     <div class="pick-type-button">
       <div ref="cityPicker" style="position:relative;">
         <div class="initial-address">{{chooseList[0].name}}</div>
@@ -54,7 +54,7 @@
 
 <script>
 export default {
-  name: 'HelloWorld',
+  name: 'address-picker',
   data () {
     return {
       address: '',
@@ -82,18 +82,27 @@ export default {
     })
   },
   methods: {
+    closePickerHandle (e) {
+      if (this.$refs.workType) {
+        this.$refs.workType.style.animationName = 'wrapper-gradient-hide'
+      } else if (this.$refs.issueDate) {
+        this.$refs.issueDate.style.animationName = 'wrapper-gradient-hide'
+      }
+      this.currentPicker = ''
+    },
     showPickList (pickType) {
+      if (this.currentPicker === '') {
+        window.addEventListener('click', this.closePickerHandle, true)
+      }
       this.currentPicker = pickType
     },
     workTypePickHandle (value) {
       this.currentPicker = ''
       this.workType = value === '不限' ? '所有工作类型' : value
-      this.$refs.workType.style.animationName = 'wrapper-gradient-hide'
     },
     issueDatePickHandle (value) {
       this.currentPicker = ''
       this.issueDate = value === '不限' ? '所有发布时间' : value
-      this.$refs.issueDate.style.animationName = 'wrapper-gradient-hide'
     },
     showCityPicker () {
       this.chooseList[0].name = ''
@@ -135,19 +144,27 @@ export default {
           console.log('在这里发送请求')
         }
       }, 100)
+    },
+    currentPicker (newValue, oldValue) {
+      if (newValue === '') {
+        console.log('移除')
+        window.removeEventListener('click', this.closePickerHandle, true)
+      }
     }
+  },
+  mounted () {
+    this.$Tools.getElementTouchMovelength(this.$refs.addressPicker, (slipeDirection) => {
+      if (slipeDirection.left) {
+        this.$router.back()
+      }
+    })
   }
 }
 </script>
 
 <!-- Add "scoped" attribute to limit CSS to this component only -->
 <style scoped lang="less">
-@import "./../assets/css/common.css";
 // reset css
-* {
-  margin: 0;
-  padding: 0;
-}
 /deep/.picker-items-col {
   touch-action: none;
 }
@@ -157,6 +174,9 @@ li {
 }
 
 // less css
+.addressPicker {
+  height: calc(100vh - 45px);
+}
 .pick-type-button {
   height: 48px;
   background: rgba(255, 255, 255, 1);
@@ -206,12 +226,7 @@ li {
   background-color: transparent;
   z-index: 9;
 }
-// 单行文本溢出
-.elliptical {
-  overflow:hidden;
-  text-overflow:ellipsis;
-  white-space:nowrap;
-}
+
 .initial-address {
   position: absolute;
 }

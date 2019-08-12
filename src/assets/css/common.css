@@ -65,3 +65,23 @@
   z-index: 1;
   padding: 0 .5rem;
 }
+
+/* 清除浮动 */
+.clearfix {
+  *zoom:1;
+}
+.clearfix::after {
+  content: '';
+  display: block;
+  clear: both;
+  visibility: hidden;
+  height: 0;
+  font-size: 0;
+}
+
+ /* 单行文本溢出 */
+.elliptical {
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}

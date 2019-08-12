@@ -11,19 +11,10 @@
       </div>
       <!-- 详细内容 -->
       <div ref="nextPage" class="content-page">
-        <div class="item" @click="showDemo('home')">
+        <div v-for = "(item, index) in allDemos" :key="index" class="item border" @click="showDemo(item.path)">
           <div class="item-content">
-            <div class="item-title">合理使用监听事件</div>
-            <div class="item-time">2019-08-07</div>
-          </div>
-          <div class="item-tmg">
-            <img src="./../assets/images/listener.jpg" alt="">
-          </div>
-        </div>
-        <div class="item" @click="showDemo('about')">
-          <div class="item-content">
-            <div class="item-title">合理使用监听事件</div>
-            <div class="item-time">2019-08-07</div>
+            <div class="item-title elliptical">{{ item.name }}</div>
+            <div class="item-time">{{ item.createTime }}</div>
           </div>
           <div class="item-tmg">
             <img src="./../assets/images/listener.jpg" alt="">
@@ -35,19 +26,48 @@
 </template>
 
 <script>
-import { setInterval } from 'timers'
 export default {
   name: 'index',
   data () {
     return {
       devicePixelRatio: 0,
       slipeDirection: null,
-      currentPage: 'firstPage'
+      currentPage: 'firstPage',
+      allDemos: [
+        {
+          name: 'outline-offset属性和Animation动画',
+          createTime: '2019-08-08',
+          path: 'cssmodel/animation'
+        },
+        {
+          name: 'Animation动画--太极图',
+          createTime: '2019-08-09',
+          path: 'cssmodel/taiji'
+        },
+        {
+          name: 'Animation动画--进度条',
+          createTime: '2019-08-09',
+          path: 'cssmodel/progressbar'
+        },
+        {
+          name: 'Bootstrap--地址选择器',
+          createTime: '2019-08-09',
+          path: 'jsmodel/addresspicker'
+        },
+        {
+          name: 'MINISLIDESHOW',
+          createTime: '2019-08-12',
+          path: 'jsmodel/minislideshow'
+        }
+      ]
     }
   },
   mounted () {
     this.devicePixelRatio = window.devicePixelRatio
     this.$nextTick(() => {
+      this.$refs.firstPage.addEventListener('touchmove', (e) => {
+        e.preventDefault()
+      }, false)
       this.$Tools.getElementTouchMovelength(this.$refs.firstPage, (slipeDirection) => {
         if (slipeDirection.up && this.currentPage === 'firstPage') {
           this.showNextPage()
@@ -55,7 +75,7 @@ export default {
         }
       })
       this.$Tools.getElementTouchMovelength(this.$refs.nextPage, (slipeDirection) => {
-        if (slipeDirection.down && this.currentPage === 'nextPage') {
+        if (slipeDirection.down && this.currentPage === 'nextPage' && this.$refs.nextPage.scrollTop === 0) {
           this.hideNextPage()
           this.currentPage = 'firstPage'
         }
@@ -66,24 +86,10 @@ export default {
     showNextPage () {
       this.$refs.firstPage.style.animationName = 'hidefirstpage'
       this.$refs.header.style.animationName = 'showHeader'
-      setTimeout(() => {
-        this.$refs.index.style.overflow = 'scroll'
-        let scrolllength = document.body.scrollTop
-        let timer = setInterval(() => {
-          if (document.body.scrollTop !== 0) {
-            document.body.scrollTop = document.body.scrollTop - 1
-          } else {
-            clearInterval(timer)
-          }
-        }, scrolllength)
-      }, 10)
     },
     hideNextPage () {
       this.$refs.firstPage.style.animationName = 'showfirstpage'
       this.$refs.header.style.animationName = 'hideHeader'
-      setTimeout(() => {
-        this.$refs.index.style.overflow = 'hidden'
-      }, 10)
     },
     showDemo (path) {
       this.$router.push(path)
@@ -124,7 +130,6 @@ export default {
 }
 // 内容展示板块
 .content-section {
-  height: -webkit-calc(100vh - 45px);
   height: calc(100vh - 45px);
   // 首屏页面
   .first-page {
@@ -146,11 +151,12 @@ export default {
   }
   // 主体内容区
   .content-page {
-    min-height: -webkit-calc(100vh - 45px);
-    min-height: calc(100vh - 45px);
+    height: 100%;
     background-color: #f3f3f3;
     padding: 10px 0 10px;
     box-sizing: border-box;
+    overflow: scroll;
+    -webkit-overflow-scrolling: touch;
     .item {
       border-radius: 5px;
       height: 110px;
@@ -161,10 +167,11 @@ export default {
       justify-content: space-between;
       align-items: center;
       .item-content {
-        flex: 1;
+        width: calc(100vw - 52px - 60px);
         .item-title {
           font-size: 20px;
           font-weight: 700;
+          line-height: 22px;
         }
         .item-time {
           font-size: 14px;
@@ -177,6 +184,13 @@ export default {
         height: 60px;
       }
     }
+  }
+  .border { border: 1px solid #999 }
+  @media screen and (-webkit-min-device-pixel-ratio: 2) {
+      .border { border: 0.5px solid #999 }
+  }
+  @media screen and (-webkit-min-device-pixel-ratio: 3) {
+      .border { border: 0.333333px solid #999 }
   }
 }
 </style>

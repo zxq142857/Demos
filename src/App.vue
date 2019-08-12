@@ -2,23 +2,32 @@
   <div id="app">
     <transition
       mode="out-in"
-      :duration="600"
+      :duration="300"
       enter-active-class="animated fadeIn"
       leave-active-class="animated fadeOut"
     >
-      <router-view/>
+      <keep-alive :include=includedComponents :exclude=excludedComponents>
+        <router-view></router-view>
+      </keep-alive>
     </transition>
   </div>
 </template>
 
+<script>
+import { mapState } from 'vuex'
+export default {
+  name: 'app',
+  computed: {
+    ...mapState({
+      includedComponents: state => state.includedComponents.join(','),
+      excludedComponents: state => state.excludedComponents.join(',')
+    })
+  }
+}
+</script>
+
 <style lang="less">
 @import './assets/css/common.css';
-* {
-  margin: 0;
-  padding: 0;
-  // touch-action: pan-y;
-}
-
 #app {
   font-family: 'Avenir', Helvetica, Arial, sans-serif;
   -webkit-font-smoothing: antialiased;

@@ -4,7 +4,8 @@ module.exports = {
   configureWebpack: {
     externals: {
       swiper: 'Swiper',
-      jquery: '$'
+      jquery: '$',
+      axios: 'axios'
     }
   }
 }
