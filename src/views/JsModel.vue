@@ -1,6 +1,6 @@
 <template>
   <div class="js-model">
-    <header>JsModel</header>
+    <header @click="$router.back()">JsModel</header>
     <!-- 模型展示 -->
     <router-view></router-view>
   </div>
