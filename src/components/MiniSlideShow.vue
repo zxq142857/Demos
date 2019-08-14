@@ -1,6 +1,6 @@
 <template>
   <div class="slideshow__model" v-if="value" @click="setVisible" @touchmove.prevent>
-    {{ num }}
+    <span style=" position: fixed; z-index: 9999; color: #fff;">双指缩放开启：{{isDoubleTouch}}，单指滑动开启：{{isSingleTouch}},{{debugInfo}}</span>
     <div class="slideshow-wrapper">
       <div class="medio-list" ref="medioList">
         <div class="medio-list-slide" v-for="(item,index) in medioData" :key="index">
@@ -40,7 +40,7 @@ export default {
   },
   data () {
     return {
-      num: 0,
+      swiper: null,
       clientWidth: 0,
       displacement: 0,
       temporaryDisplacement: 0,
@@ -57,7 +57,12 @@ export default {
         start: [],
         end: []
       },
-      istouch: false
+      isSingleTouch: true,
+      isDoubleTouch: false,
+      debugInfo: '',
+      currentScale: 0,
+      endScale: 0,
+      lastTouchScale: 0
     }
   },
   computed: {
@@ -67,7 +72,7 @@ export default {
     },
     // 滑动距离
     slidingLength () {
-      if (this.isMoved) {
+      if (this.isMoved && this.isSingleTouch) {
         return this.startCoordinates.clientX - this.currentCoordinates.clientX
       } else {
         return 0
@@ -82,14 +87,15 @@ export default {
         // 初始化轮播图
         this.setInitialSlide()
         // 监听单指左右滑动，切换幻灯片 只有一张图片不能切换
-        this.addLitenerForSlideshow()
+        // this.addLitenerForSlideshow()
       })
     },
     slidingLength (newValue, oldValue) {
-      if (this.isMoved && !this.istouch) {
+      if (this.isMoved && this.isSingleTouch) {
         let temporaryDisplacement = this.computeLength(this.displacement + newValue)
         this.temporaryDisplacement = temporaryDisplacement
         this.$refs.medioList.style.transform = `translate3d(-${temporaryDisplacement}px, 0px, 0px)`
+        this.debugInfo = this.debugInfo.concat(',左右滑动了')
       }
     }
   },
@@ -107,39 +113,26 @@ export default {
       let initialDisplacement = this.clientWidth * this.initialSlide
       this.displacement = initialDisplacement
       this.$refs.medioList.style.transform = `translate3d(-${initialDisplacement}px, 0px, 0px)`
-      document.getElementsByClassName('medio-list-slide')[this.indexes].firstChild.classList.add('list-slide-active-img')
       this.addLIstenerForImg()
     },
     // 切换轮播图
     addLitenerForSlideshow () {
-      let swiper = document.querySelector('.slideshow-wrapper')
-      swiper.addEventListener('touchstart', (e) => {
-        // console.log('touchstart')
-        this.isMoved = false
-        this.$set(this.startCoordinates, 'clientX', e.touches[0].clientX)
-        this.$set(this.startCoordinates, 'clientY', e.touches[0].clientY)
-      }, true)
-      swiper.addEventListener('touchmove', (e) => {
-        this.isMoved = true
-        this.$set(this.currentCoordinates, 'clientX', e.touches[0].clientX)
-        this.$set(this.currentCoordinates, 'clientY', e.touches[0].clientY)
-      }, true)
-      swiper.addEventListener('touchend', (e) => {
-        if (this.isMoved && this.temporaryDisplacement !== 0 && !this.istouch) {
-          this.num = this.temporaryDisplacement
-          let slideLength = this.displacement - this.temporaryDisplacement
-          this.$refs.medioList.style.transitionDuration = '300ms'
-          if (Math.abs(slideLength) > 50) {
-            let direction = slideLength > 0 ? 1 : -1
-            let endLength = this.displacement - (this.clientWidth * direction)
-            this.displacement = endLength
-            this.$refs.medioList.style.transform = `translate3d(-${endLength}px, 0px, 0px)`
-            this.addClassForImg()
-          } else {
-            this.$refs.medioList.style.transform = `translate3d(-${this.displacement}px, 0px, 0px)`
-          }
+      this.swiper = document.querySelector('.slideshow-wrapper')
+      this.swiper.addEventListener('touchstart', (e) => {
+        if (this.isSingleTouch) {
+          this.isMoved = false
+          this.$set(this.startCoordinates, 'clientX', e.touches[0].clientX)
+          this.$set(this.startCoordinates, 'clientY', e.touches[0].clientY)
         }
       }, true)
+      this.swiper.addEventListener('touchmove', (e) => {
+        if (this.isSingleTouch) {
+          this.isMoved = true
+          this.$set(this.currentCoordinates, 'clientX', e.touches[0].clientX)
+          this.$set(this.currentCoordinates, 'clientY', e.touches[0].clientY)
+        }
+      }, true)
+      this.swiper.addEventListener('touchend', this.setSlideHandle, true)
     },
     // 计算滑动的距离
     computeLength (length) {
@@ -152,39 +145,91 @@ export default {
         return 0
       }
     },
-    // img添加active类名
-    addClassForImg () {
-      this.medioData.forEach((element, index) => {
-        let slideNode = document.getElementsByClassName('medio-list-slide')[index].firstChild
-        if (slideNode.tagName === 'IMG') {
-          slideNode.className = ''
-        }
-      })
-      document.getElementsByClassName('medio-list-slide')[this.indexes].firstChild.classList.add('list-slide-active-img')
-    },
+    // 添加双指缩放事件
     addLIstenerForImg () {
-      let dom = document.getElementsByClassName('list-slide-active-img')[0]
-      this.setGesture(dom)
+      let imgNodeList = document.querySelectorAll('.medio-list-slide img')
+      Array.prototype.forEach.call(imgNodeList, (element) => {
+        this.setGesture(element)
+      })
     },
-    // 手势事件
+    // 设置单指滑动切换页面
+    setSlideHandle () {
+      if (this.isMoved && this.temporaryDisplacement !== 0 && this.isSingleTouch) {
+        this.debugInfo = '触发了单指滑动事件'
+        let slideLength = this.displacement - this.temporaryDisplacement
+        this.$refs.medioList.style.transitionDuration = '300ms'
+        if (Math.abs(slideLength) > 50) {
+          // 图片还原到原始大小
+          let currentNode = this.$refs.medioList.children[this.indexes - 1]
+          if (currentNode.firstElementChild.tagName === 'IMG') {
+            currentNode.firstElementChild.style.transitionDuration = `100ms`
+            currentNode.firstElementChild.style.transform = `translate3d(0px, 0px, 0px) scale(1)`
+            this.currentScale = 1
+          }
+
+          // 切换到下一节点
+          let direction = slideLength > 0 ? 1 : -1 // 滑动方向
+          let endLength = this.displacement - (this.clientWidth * direction) // 下一节点停留的位置
+          this.displacement = endLength // 记录下一节点的位置
+          this.$refs.medioList.style.transform = `translate3d(-${endLength}px, 0px, 0px)` // 切换到下一节点
+        } else {
+          this.$refs.medioList.style.transform = `translate3d(-${this.displacement}px, 0px, 0px)`
+        }
+      } else if (this.isMoved && this.temporaryDisplacement !== 0 && !this.isSingleTouch) {
+
+      }
+    },
+    // 设置双指缩放事件
     setGesture (dom) {
       dom.addEventListener('touchstart', (e) => {
-        this.num = e.touches.length
         if (e.touches.length >= 2) { // 判断是否有两个点在屏幕上
-          this.istouch = true
+          this.isDoubleTouch = true
+          this.isSingleTouch = false
           this.secondFinger.start = e.touches // 得到第一组两个点
+          this.swiper.removeEventListener('touchend', this.setSlideHandle, true)
         };
       }, false)
-      document.addEventListener('touchmove', (e) => {
-        if (e.touches.length >= 2 && this.istouch) {
+      dom.addEventListener('touchmove', (e) => {
+        // this.debugInfo = this.debugInfo.concat(',触发了双指缩放事件')
+        // dom.style.color = `#ccc`
+        let node = e.srcElement ? e.srcElement : e.target
+        if (e.touches.length >= 2 && this.isDoubleTouch) {
           let now = e.touches // 得到第二组两个点
           let scale = this.getDistance(now[0], now[1]) / this.getDistance(this.secondFinger.start[0], this.secondFinger.start[1]) // 得到缩放比例，getDistance是勾股定理的一个方法
-          dom.style.transform = `translate3d(0px, 0px, 0px) scale(${scale.toFixed(2)})`
+          let needAddScale = this.currentScale > 1 ? this.currentScale : 0
+          if (this.lastTouchScale > scale) {
+            this.endScale = needAddScale - parseFloat(scale.toFixed(2))
+          } else {
+            this.endScale = parseFloat(scale.toFixed(2)) + needAddScale
+          }
+          this.debugInfo = this.endScale
+          node.style.transform = `translate3d(0px, 0px, 0px) scale(${this.endScale})`
+          node.style.zIndex = '999'
         };
-      }, { passive: false })
-      document.addEventListener('touchend', (e) => {
-        if (this.istouch) {
-          this.istouch = false
+      }, false)
+      dom.addEventListener('touchend', (e) => {
+        if (this.isDoubleTouch) {
+          let node = e.srcElement ? e.srcElement : e.target
+          this.isDoubleTouch = false
+          this.isSingleTouch = true
+          if (this.endScale > 3) {
+            node.style.transitionDuration = `300ms`
+            node.style.zIndex = '9'
+            node.style.transform = `translate3d(0px, 0px, 0px) scale(3)`
+            this.currentScale = 3
+          } else if (this.endScale < 3) {
+            // alert('suo')
+            this.currentScale = 1
+            node.style.transitionDuration = `300ms`
+            node.style.transform = `translate3d(0px, 0px, 0px) scale(1)`
+          } else {
+            this.currentScale = this.endScale
+          }
+          // this.debugInfo = this.currentScale
+          setTimeout(() => {
+            node.style.transitionDuration = `0ms`
+            this.swiper.addEventListener('touchend', this.setSlideHandle, true)
+          }, 300)
         };
       }, false)
     },
@@ -246,6 +291,7 @@ export default {
   max-width: 100%;
   max-height: 85vh;
   border-radius: 5px;
+  position: relative;
 }
 .slide-pagination {
   position: absolute;
