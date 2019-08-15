@@ -212,9 +212,9 @@ export default {
           if (this.temporaryMoveData.lastScale > scale) {
             // 滑动 缩小
             let shrunkenScale = this.temporaryMoveData.lastScale - scale
-            shrunkenScale = parseFloat(shrunkenScale.toFixed(2)) * 0.8 // 控制别让他缩放的太快了
-
+            shrunkenScale = Math.round(shrunkenScale * 100) / 100 * 0.8 // 控制别让他缩放的太快了
             this.endScale = this.endScale - shrunkenScale
+            node.style.cssText = `-webkit-transform:translate3d(0px, 0px, 0px) scale(${this.endScale})`
           } else {
           // 滑动的过程中放大
             if (this.currentScale !== 0) {
