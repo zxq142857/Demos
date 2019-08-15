@@ -53,8 +53,8 @@ export default {
         clientX: 0,
         clientY: 0
       },
-      secondFinger: {
-        start: [],
+      fingerPosition: {
+        one: [],
         end: []
       },
       isSingleTouch: true,
@@ -62,7 +62,10 @@ export default {
       debugInfo: '',
       currentScale: 0,
       endScale: 0,
-      lastTouchScale: 0
+      lastTouchScale: 0,
+      temporaryMoveData: {
+        lastScale: 0
+      }
     }
   },
   computed: {
@@ -97,6 +100,9 @@ export default {
         this.$refs.medioList.style.transform = `translate3d(-${temporaryDisplacement}px, 0px, 0px)`
         this.debugInfo = this.debugInfo.concat(',左右滑动了')
       }
+    },
+    endScale (newValue, oldValue) {
+      // this.debugInfo = this.debugInfo.concat(this.endScale + '☺')
     }
   },
   mounted () {
@@ -106,6 +112,7 @@ export default {
   methods: {
     // 关闭模态框
     setVisible () {
+      this.debugInfo = ''
       this.$emit('input', false)
     },
     // 初始化轮播图
@@ -164,6 +171,7 @@ export default {
           if (currentNode.firstElementChild.tagName === 'IMG') {
             currentNode.firstElementChild.style.transitionDuration = `100ms`
             currentNode.firstElementChild.style.transform = `translate3d(0px, 0px, 0px) scale(1)`
+            alert('0')
             this.currentScale = 1
           }
 
@@ -183,60 +191,77 @@ export default {
     setGesture (dom) {
       dom.addEventListener('touchstart', (e) => {
         if (e.touches.length >= 2) { // 判断是否有两个点在屏幕上
-          this.isDoubleTouch = true
-          this.isSingleTouch = false
-          this.secondFinger.start = e.touches // 得到第一组两个点
+          this.isDoubleTouch = true // 开启双指缩放功能
+          this.isSingleTouch = false // 关闭轮播功能
+          this.fingerPosition.one = e.touches[0] // 得到第一个手指坐标
+          this.fingerPosition.two = e.touches[1] // 得到第二个手指坐标
           this.swiper.removeEventListener('touchend', this.setSlideHandle, true)
         };
       }, false)
       dom.addEventListener('touchmove', (e) => {
-        // this.debugInfo = this.debugInfo.concat(',触发了双指缩放事件')
-        // dom.style.color = `#ccc`
+        // 获取到当前操作的DOM
         let node = e.srcElement ? e.srcElement : e.target
         if (e.touches.length >= 2 && this.isDoubleTouch) {
-          let now = e.touches // 得到第二组两个点
-          let scale = this.getDistance(now[0], now[1]) / this.getDistance(this.secondFinger.start[0], this.secondFinger.start[1]) // 得到缩放比例，getDistance是勾股定理的一个方法
-          let needAddScale = this.currentScale > 1 ? this.currentScale : 0
-          if (this.lastTouchScale > scale) {
-            this.endScale = needAddScale - parseFloat(scale.toFixed(2))
+          // 得到第二组两个点
+          let now = e.touches
+          // 得到缩放比例，getDistance是勾股定理的一个方法
+          let scale = this.getDistance(now[0], now[1]) / this.getDistance(this.fingerPosition.one, this.fingerPosition.two)
+          // 缩放比小数处理
+          scale = parseFloat(scale.toFixed(2))
+          // 滑动的过程中缩小
+          if (this.temporaryMoveData.lastScale > scale) {
+            // 滑动 缩小
+            let shrunkenScale = this.temporaryMoveData.lastScale - scale
+            shrunkenScale = parseFloat(shrunkenScale.toFixed(2)) * 0.8 // 控制别让他缩放的太快了
+
+            this.endScale = this.endScale - shrunkenScale
           } else {
-            this.endScale = parseFloat(scale.toFixed(2)) + needAddScale
+          // 滑动的过程中放大
+            if (this.currentScale !== 0) {
+              this.endScale = Math.round((this.currentScale + (scale - 1)) * 100) / 100
+              node.style.cssText = `-webkit-transform:translate3d(0px, 0px, 0px) scale(${this.endScale})`
+            } else {
+              this.endScale = scale
+              node.style.cssText = `-webkit-transform:translate3d(0px, 0px, 0px) scale(${this.endScale})`
+            }
           }
-          this.debugInfo = this.endScale
-          node.style.transform = `translate3d(0px, 0px, 0px) scale(${this.endScale})`
+          this.temporaryMoveData.lastScale = scale
           node.style.zIndex = '999'
         };
       }, false)
       dom.addEventListener('touchend', (e) => {
         if (this.isDoubleTouch) {
+          // 获取到当前操作的DOM
           let node = e.srcElement ? e.srcElement : e.target
-          this.isDoubleTouch = false
+          // 开启轮播功能
           this.isSingleTouch = true
+          // 关闭双指缩放功能
+          this.isDoubleTouch = false
+          // this.debugInfo = this.endScale
           if (this.endScale > 3) {
-            node.style.transitionDuration = `300ms`
-            node.style.zIndex = '9'
-            node.style.transform = `translate3d(0px, 0px, 0px) scale(3)`
-            this.currentScale = 3
-          } else if (this.endScale < 3) {
-            // alert('suo')
-            this.currentScale = 1
-            node.style.transitionDuration = `300ms`
-            node.style.transform = `translate3d(0px, 0px, 0px) scale(1)`
-          } else {
-            this.currentScale = this.endScale
+            // 当缩放比大于3时，设置回弹效果，回弹为scale为3
+            this.endScale = 3
+            node.style.cssText = `z-index:9;-webkit-transition-duration:300ms;transition-duration:300ms;-webkit-transform:translate3d(0px, 0px, 0px) scale(3);transform:translate3d(0px, 0px, 0px) scale(3)`
+          } else if (this.endScale < 1) {
+            // 当缩放比小于1时，设置回弹效果，回弹为scale为1
+            this.endScale = 1
+            node.style.cssText = `z-index:9;-webkit-transition-duration:300ms;transition-duration:300ms;-webkit-transform:translate3d(0px, 0px, 0px) scale(3);transform:translate3d(0px, 0px, 0px) scale(1)`
           }
-          // this.debugInfo = this.currentScale
+          // 记录双指缩放操作结束时的scale
+          this.currentScale = this.endScale
+          // 清除滑动参数的临时数据
+          this.temporaryMoveData.lastScale = 0
+          node.style.transitionDuration = `0ms`
           setTimeout(() => {
-            node.style.transitionDuration = `0ms`
             this.swiper.addEventListener('touchend', this.setSlideHandle, true)
           }, 300)
         };
       }, false)
     },
     // 辅助方法
-    getDistance (p1, p2) {
-      let x = p2.pageX - p1.pageX
-      let y = p2.pageY - p1.pageY
+    getDistance (one, two) {
+      let x = one.pageX - two.pageX
+      let y = one.pageY - two.pageY
       return Math.sqrt((x * x) + (y * y))
     }
   }
@@ -269,8 +294,6 @@ export default {
   transition-property: transform;
   -webkit-box-sizing: content-box;
   box-sizing: content-box;
-  /* transition-duration: 0ms; */
-  /* transform: translate3d(-320px, 0px, 0px); */
 }
 .medio-list .medio-list-slide {
   -webkit-flex-shrink: 0;
@@ -299,6 +322,8 @@ export default {
   -webkit-transition: .3s opacity;
   -o-transition: .3s opacity;
   transition: .3s opacity;
+  -webkit-transform: translate3d(0,0,0);
+  -o-transform: translate3d(0,0,0);
   transform: translate3d(0,0,0);
   z-index: 10;
   bottom: 4vh;
