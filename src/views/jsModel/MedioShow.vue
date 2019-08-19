@@ -1,6 +1,5 @@
 <template>
   <div class="medio-show">
-    <!-- http://192.168.2.27/qudao.html#/company/%E8%81%94%E5%8A%A8%EF%BC%88%E5%95%A6%E5%95%A6%E5%95%A6%EF%BC%89/230461/20181272/585,911/8236,8240 -->
     <div class="images-list" v-if="slideMedioData.length">
       <img v-for="(item,index) in slideMedioData" :key="index" :src="item" alt="img" @click="showSlideShow(index)">
     </div>
