@@ -195,7 +195,7 @@ export default {
     setSlideHandle () {
       // 如果
       if (this.isNormalSized && this.temporaryDisplacement !== 0 && this.isSingleTouch) {
-        this.debugInfo = '触发了单指滑动事件'
+        console.log('触发了单指滑动事件')
         let slideLength = this.displacement - this.temporaryDisplacement
         this.$refs.medioList.style.transitionDuration = '300ms'
         if (Math.abs(slideLength) > 50) {
@@ -281,7 +281,6 @@ export default {
       dom.addEventListener('touchend', (e) => {
         // 获取到当前操作的DOM
         let node = e.srcElement ? e.srcElement : e.target
-        let isScale = node.style.transform === '' || node.style.transform === 'scale(1)'
         if (this.isDoubleTouch) { // 双指操作时
           this.isNormalSized = false
           // 开启轮播功能
