@@ -1,6 +1,6 @@
 <template>
   <div class="slideshow__model" v-if="value" @click="setVisible" @touchmove.prevent>
-    <!-- <span style=" position: fixed; z-index: 9999; color: #fff;">双指缩放开启：{{isDoubleTouch}}，单指滑动开启：{{isSingleTouch}},{{debugInfo}}</span> -->
+    <span style=" position: fixed; z-index: 9999; color: #fff;">{{debugInfo}}</span>
     <div class="slideshow-wrapper">
       <div class="medio-list" ref="medioList">
         <div class="medio-list-slide" v-for="(item,index) in medioData" :key="index">
@@ -15,7 +15,6 @@
 </template>
 
 <script>
-import { setTimeout } from 'timers'
 export default {
   props: {
     value: {
@@ -61,16 +60,13 @@ export default {
         level: false
       },
       // 下滑关闭操作的时间，当下滑操作的时间在1000ms内完成，则关闭组件，如果超过1000ms，则回弹至初始位置
-      moveTime: 0,
-
-      startCoordinates: {
-        clientX: 0,
-        clientY: 0
-      },
-      currentCoordinates: {
-        clientX: 0,
-        clientY: 0
-      },
+      operationTimedOut: false,
+      Timer: null,
+      // 记录滑动的起始和移动中的位置的clientX
+      startSlideX: 0, // 换页滑动开始的时候的clientX
+      endSlideX: 0, // 换页滑动中的clientX
+      // 在touchend事件中的定时器
+      timeOut: null,
       singleFingerPosition: {
         start: {},
         end: {},
@@ -104,11 +100,17 @@ export default {
     },
     // 滑动距离
     slidingLength () {
-      if (this.isSingleTouch) {
-        return this.startCoordinates.clientX - this.currentCoordinates.clientX
+      if (this.endSlideX !== 0) {
+        return this.startSlideX - this.endSlideX
       } else {
         return 0
       }
+    },
+    // 是否允许左右滑动换页
+    canPaging () {
+      // 单个手指  &&  图片未放大  && 没在下滑关闭的过程中 && 未在缩放的过程中
+      let controlCondition = this.isSingleTouch && this.isNormalSized && !this.iscloseingDown
+      return controlCondition
     }
   },
   watch: {
@@ -125,10 +127,10 @@ export default {
     },
     slidingLength (newValue, oldValue) {
       if (this.isSingleTouch && !this.iscloseingDown) { // 左右滑动的条件： 单指 且 不是在下滑关闭的过程中
-        console.log('触发了左右滑动')
+        this.pageTurning = true
         let temporaryDisplacement = this.computeLength(this.displacement + newValue)
         this.temporaryDisplacement = temporaryDisplacement
-        this.$refs.medioList.style.transform = `translate3d(-${temporaryDisplacement}px, 0px, 0px)`
+        this.$refs.medioList.style.transform = `translate3d(${-temporaryDisplacement}px, 0px, 0px)`
       }
     }
   },
@@ -153,52 +155,54 @@ export default {
     addLitenerForSlideshow () {
       this.swiper = document.querySelector('.slideshow-wrapper')
       this.swiper.addEventListener('touchstart', (e) => {
-        if (this.isSingleTouch && this.isNormalSized) {
+        if (this.canPaging) {
           this.pageTurning = false // 正在切换页面
-          this.$set(this.startCoordinates, 'clientX', e.touches[0].clientX)
-          this.$set(this.startCoordinates, 'clientY', e.touches[0].clientY)
+          // 开启记时
+          this.Timer = setTimeout(() => {
+            this.operationTimedOut = true
+          }, 1000)
+          // 记录切换的开始位置
+          this.startSlideX = e.touches[0].clientX
         }
       }, true)
       this.swiper.addEventListener('touchmove', (e) => {
-        if (this.isSingleTouch && this.isNormalSized) {
-          this.pageTurning = true
-          this.$set(this.currentCoordinates, 'clientX', e.touches[0].clientX)
-          this.$set(this.currentCoordinates, 'clientY', e.touches[0].clientY)
+        let direction = this.getDirection(this.singleFingerPosition.start, this.singleFingerPosition.end)
+        if (this.canPaging && (direction === 'left' || direction === 'right')) {
+          this.endSlideX = e.touches[0].clientX
         }
       }, true)
       this.swiper.addEventListener('touchend', this.setSlideHandle, true)
     },
-    // 切换Node时需要清除的一些参数
-    setNodeInfo () {
-      // 是否被放大置为false
-      this.isEnlarged = false
-    },
-    // 计算滑动的距离
-    computeLength (length) {
-      let maxLength = this.clientWidth * (this.medioData.length - 1)
-      if (length > 0 && length < maxLength) {
-        return length
-      } else if (length > 0 && length > maxLength) {
-        return maxLength
-      } else if (length < 0) {
-        return 0
-      }
-    },
-    // 添加双指缩放事件
-    addLIstenerForImg () {
-      let imgNodeList = document.querySelectorAll('.medio-list-slide img')
-      Array.prototype.forEach.call(imgNodeList, (element) => {
-        this.setGesture(element)
-      })
-    },
     // 设置单指滑动切换页面
     setSlideHandle () {
-      // 如果
-      if (this.isNormalSized && this.temporaryDisplacement !== 0 && this.isSingleTouch) {
-        console.log('触发了单指滑动事件')
-        let slideLength = this.displacement - this.temporaryDisplacement
+      if (this.canPaging && this.temporaryDisplacement !== 0) {
+        // 设置缓动效果，并及时清除
         this.$refs.medioList.style.transitionDuration = '300ms'
-        if (Math.abs(slideLength) > 50) {
+        setTimeout(() => {
+          this.$refs.medioList.style.transitionDuration = '0ms'
+        }, 300)
+
+        // 关闭滑动功能，防止页面抖动
+        this.endSlideX = 0
+        this.startSlideX = 0
+
+        // 如果滑动超出了左右的最大值，也需要回弹
+        let isOverMax = this.temporaryDisplacement < 0 || this.temporaryDisplacement > (this.clientWidth * (this.medioData.length - 1))
+        if (isOverMax) {
+          this.$refs.medioList.style.transform = `translate3d(-${this.displacement}px, 0px, 0px)`
+          this.startSlideX = 0
+          this.endSlideX = 0
+          // 清除定时器
+          this.operationTimedOut = false
+          clearTimeout(this.Timer)
+          this.Timer = null
+          return
+        }
+
+        // 换页时，单指滑动的距离
+        let slideLength = this.displacement - this.temporaryDisplacement
+        // 如果单指滑动的距离大于屏幕的一半 或 滑动的时间小于1000ms，则换页
+        if (Math.abs(slideLength) > (this.clientWidth / 2) || !this.operationTimedOut) {
           // 图片还原到原始大小
           let currentNode = this.$refs.medioList.children[this.indexes]
           if (currentNode.firstElementChild.tagName === 'IMG') {
@@ -213,8 +217,33 @@ export default {
           this.$refs.medioList.style.transform = `translate3d(-${endLength}px, 0px, 0px)` // 切换到下一节点
         } else {
           this.$refs.medioList.style.transform = `translate3d(-${this.displacement}px, 0px, 0px)`
+          this.startSlideX = 0
+          this.endSlideX = 0
         }
+
+        // 清除定时器
+        this.operationTimedOut = false
+        clearTimeout(this.Timer)
+        this.Timer = null
       }
+    },
+    // 计算滑动的距离
+    computeLength (length) {
+      let maxLength = this.clientWidth * (this.medioData.length - 1)
+      if (length > 0 && length < maxLength) {
+        return length
+      } else if (length > 0 && length > maxLength) {
+        return Math.round(maxLength + Math.sqrt(length - maxLength) * 6)
+      } else if (length < 0) {
+        return -Math.round(Math.sqrt(-length) * 6)
+      }
+    },
+    // 添加双指缩放事件
+    addLIstenerForImg () {
+      let imgNodeList = document.querySelectorAll('.medio-list-slide img')
+      Array.prototype.forEach.call(imgNodeList, (element) => {
+        this.setGesture(element)
+      })
     },
     // 设置双指图片的缩放功能，以及放大后的单指滑动查看功能
     setGesture (dom) {
@@ -223,13 +252,11 @@ export default {
         let node = e.srcElement ? e.srcElement : e.target
         if (e.touches.length >= 2) { //
           this.isNormalSized = false
-          this.isDoubleTouch = true // 开启双指缩放功能
-          this.isSingleTouch = false // 关闭轮播功能
+          this.isSingleTouch = false
           this.doubleFingerPosition.one = e.touches[0] // 得到第一个手指坐标
           this.doubleFingerPosition.two = e.touches[1] // 得到第二个手指坐标
         } else {
           this.singleFingerPosition.start = e.touches[0]
-          this.moveDownToclose(node)
           node.parentNode.style.transitionDuration = '0ms'
           this.rootNode.style.transitionDuration = `0ms`
         };
@@ -270,7 +297,7 @@ export default {
           let direction = this.getDirection(this.singleFingerPosition.start, this.singleFingerPosition.end)
           if (this.isTranslateScale(node) && !this.iscloseingDown) { // 当图片放大时提供滑动功能
             this.zoomInSlide(node)
-          } else { // 当图片未放大时提供下滑动关闭
+          } else if (!this.pageTurning && this.isSingleTouch) { // 当图片未放大时提供下滑动关闭
             if (direction === 'down' || this.iscloseingDown) {
               this.downSlideToClose(node)
               this.iscloseingDown = true
@@ -281,12 +308,13 @@ export default {
       dom.addEventListener('touchend', (e) => {
         // 获取到当前操作的DOM
         let node = e.srcElement ? e.srcElement : e.target
-        if (this.isDoubleTouch) { // 双指操作时
-          this.isNormalSized = false
+
+        if (!this.isSingleTouch && this.timeOut === null) { // 双指操作时
           // 开启轮播功能
-          this.isSingleTouch = true
-          // 关闭双指缩放功能
-          this.isDoubleTouch = false
+          this.timeOut = setTimeout(() => {
+            this.timeOut = null
+            this.isSingleTouch = true
+          }, 100)
           if (this.endScale > 3) {
             // 当缩放比大于3时，设置回弹效果，回弹为scale为3
             this.endScale = 3
@@ -294,26 +322,33 @@ export default {
           } else if (this.endScale < 1) {
             // 当缩放比小于1时，设置回弹效果，回弹为scale为1
             this.endScale = 1
-            node.style.cssText = node.style.cssText.concat(`z-index:9;-webkit-transition-duration:300ms;transition-duration:300ms;-webkit-transform:scale(1);transform:scale(1)`)
+            this.isNormalSized = true
+            node.style.cssText = node.style.cssText.concat(`-webkit-transition-duration:300ms;transition-duration:300ms;-webkit-transform:scale(1);transform:scale(1)`)
+            node.parentNode.style.transform = 'translate3d(0px,0px,0px)'
+          }
+          if (this.isTranslateScale(node)) { // 如果图片被放大了，则提供回弹至边界的功能
+            this.springbackToBorder(node)
           }
           // 记录双指缩放操作结束时的scale
           this.currentScale = this.endScale
           // 清除滑动参数的临时数据
           this.temporaryMoveData.lastScale = 0
           node.style.transitionDuration = `0ms`
-          setTimeout(() => {
-            this.swiper.addEventListener('touchend', this.setSlideHandle, true)
-          }, 300)
         } else { // 单指操作时
           if (!this.iscloseingDown) { // 如果图片不是在下滑时关闭的过程中时
-            this.springbackToBorder(node)
-            let lastX = node.parentNode.style.transform.match(/\(([^)]*)\)/)[1].match(/[^,*px]+/g)[0]
-            let lastY = node.parentNode.style.transform.match(/\(([^)]*)\)/)[1].match(/[^,*px]+/g)[1]
-            this.singleFingerPosition.displacement.x = +lastX
-            this.singleFingerPosition.displacement.y = +lastY
+            // this.debugInfo = this.isTranslateScale(node)
+            if (this.isTranslateScale(node)) { // 如果图片被放大了，则提供回弹至边界的功能
+              this.springbackToBorder(node)
+            }
+            if (node.parentNode.style.transform !== '') {
+              let lastX = node.parentNode.style.transform.match(/\(([^)]*)\)/)[1].match(/[^,*px]+/g)[0]
+              let lastY = node.parentNode.style.transform.match(/\(([^)]*)\)/)[1].match(/[^,*px]+/g)[1]
+              this.singleFingerPosition.displacement.x = +lastX
+              this.singleFingerPosition.displacement.y = +lastY
+            }
           } else if (this.iscloseingDown) { // 如果图片是在下滑时关闭的过程中时
             // 如果下滑的时间超过1000ms,则会弹至初始位置，反之则关闭组件
-            if (this.moveTime > 1000) {
+            if (this.operationTimedOut) { // 回弹至初始位置
               node.parentNode.style.transitionDuration = '300ms'
               node.parentNode.style.transform = 'translate3d(0px,0px,0px)'
               this.rootNode.style.backgroundColor = `rgba(0, 0, 0, 1)`
@@ -326,29 +361,25 @@ export default {
               node.style.width = 'calc((100vw - 32px) * 0.3)'
               node.style.height = '70px'
               node.style.transform = moving
-              this.rootNode.style.background = `rgba(0, 0, 0, 0`
+              node.style.opacity = '0.3'
+              this.rootNode.style.background = `rgba(0, 0, 0, 0)`
               setTimeout(() => {
                 this.setVisible()
               }, 500)
             }
             this.iscloseingDown = false
-            this.moveTime = 0
           }
-        };
-      }, false)
-    },
-    // 不放大状态下，开启下滑缩放记时
-    moveDownToclose (node) {
-      this.moveTime = 0
-      let timer = setInterval(() => {
-        if (this.moveTime > 1024) {
-          clearInterval(timer)
         }
-        this.moveTime += 10
-      }, 10)
+
+        // 清除定时器
+        this.operationTimedOut = false
+        clearTimeout(this.Timer)
+        this.Timer = null
+      }, false)
     },
     // 当图片放大时提供滑动功能
     zoomInSlide (node) {
+      this.debugInfo = `${this.operationTimedOut}`
       let boundingClientRect = node.getBoundingClientRect()
       let bottom = this.clientHeight - boundingClientRect.bottom
       let top = boundingClientRect.top
@@ -389,11 +420,12 @@ export default {
       let rightDistance = right < 0 ? 0 : right
       let topDistance = top < 0 ? 0 : top
       let bottomDistance = bottom < 0 ? 0 : bottom
+      // this.debugInfo = `${lastX}, ${rightDistance}, ${leftDistance}, ${lastY}, ${bottomDistance}, ${topDistance}`
       if (!this.isOver.vertical) { // 当图片被放大时，其是否超出了屏幕的上下边框，超出了才可以上下移动,此处是为了清除其细微的偏移量
-        bottomDistance = 0
+        bottomDistance = (bottom - top) / 2
         topDistance = 0
-      } else if (!this.isOver.vertical) {
-        leftDistance = 0
+      } else if (!this.isOver.level) {
+        leftDistance = (left - right) / 2
         rightDistance = 0
       }
       node.parentNode.style.transitionDuration = '300ms'
@@ -534,7 +566,7 @@ export default {
   -o-transform: translate3d(0,0,0);
   transform: translate3d(0,0,0);
   z-index: 10;
-  bottom: 4vh;
+  bottom: 2vh;
   left: 0;
   width: 100%;
 }
@@ -543,10 +575,10 @@ export default {
   height: 8px;
   display: inline-block;
   border-radius: 100%;
-  background: #ddd;
+  background: rgba(255, 255, 255, .3);
   margin: 0 2px;
 }
 .slide-pagination .swiper-pagination-bullets.list-slide-active {
-  background-color: #000;
+  background-color: #fff;
 }
 </style>
