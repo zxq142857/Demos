@@ -32,6 +32,7 @@
 </template>
 
 <script>
+import { setInterval, clearInterval } from 'timers'
 export default {
   props: {
     medioData: {
@@ -63,7 +64,9 @@ export default {
       isNormalSized: true, // 图片是否被放大  如果被放大了，单指滑动则不能直接切换页面，反之可以，只在双指缩放功能中可修改
       isOver: { // 当图片被放大时，其是否超出了屏幕的上下或左右边框，超出了才可以上下或左右移动
         vertical: false,
-        level: false
+        level: false,
+        verticalValue: 0,
+        levelValue: 0
       },
       // 下滑关闭操作的时间，当下滑操作的时间在1000ms内完成，则关闭组件，如果超过1000ms，则回弹至初始位置
       operationTimedOut: false,
@@ -92,6 +95,9 @@ export default {
       browserToolbarHeight: 0,
       // 单击事件计时器
       clickTimer: null,
+      // 滑动事件计时器
+      sliderTimer: null,
+      slideTime: 0,
       currentScale: 0,
       endScale: 0,
       temporaryMoveData: {
@@ -132,7 +138,6 @@ export default {
     },
     // 是否开启回弹至边缘的功能
     canBounceToBorder () {
-      //
       let controlCondition = true
       return controlCondition
     }
@@ -180,8 +185,6 @@ export default {
     // 单击关闭SLIDESHOW
     closeSlideShow () {
       this.slideshowVisible = false
-      // this.clickTimer = setTimeout(() => {
-      // }, 100)
     },
     // 初始化SLIDESHOW
     setInitialSlide () {
@@ -196,7 +199,6 @@ export default {
         if (this.canPaging) {
           this.pageTurning = false // 正在切换页面
           // 开启记时
-          this.debugInfo += 1
           this.Timer = setTimeout(() => {
             this.operationTimedOut = true
           }, 1000)
@@ -259,12 +261,11 @@ export default {
           this.startSlideX = 0
           this.endSlideX = 0
         }
-
-        // 清除定时器
-        this.operationTimedOut = false
-        clearTimeout(this.Timer)
-        this.Timer = null
       }
+      // 清除定时器
+      this.operationTimedOut = false
+      clearTimeout(this.Timer)
+      this.Timer = null
     },
     // 计算滑动的距离
     computeLength (length) {
@@ -272,9 +273,9 @@ export default {
       if (length > 0 && length < maxLength) {
         return length
       } else if (length > 0 && length > maxLength) {
-        return Math.round(maxLength + Math.sqrt(length - maxLength) * 6)
+        return Math.round(maxLength + this.dampingFunction(length - maxLength))
       } else if (length < 0) {
-        return -Math.round(Math.sqrt(-length) * 6)
+        return -Math.round(this.dampingFunction(-length))
       }
     },
     // 添加双指缩放事件
@@ -295,8 +296,14 @@ export default {
           this.doubleFingerPosition.one = e.touches[0] // 得到第一个手指坐标
           this.doubleFingerPosition.two = e.touches[1] // 得到第二个手指坐标
         } else { // 单指操作
+          // 记录滑动开始时的位置
           this.singleFingerPosition.start = e.touches[0]
-          dom.transitionDuration = '0ms'
+          // 关闭动画延迟
+          dom.style.transitionDuration = '0ms'
+          // 开启滑动记时
+          this.sliderTimer = setInterval(() => {
+            this.slideTime += 50
+          }, 50)
         };
       }, false)
       dom.addEventListener('touchmove', (e) => {
@@ -330,6 +337,7 @@ export default {
           this.singleFingerPosition.end = e.touches[0]
           // 获取滑动方向
           let direction = this.getDirection(this.singleFingerPosition.start, this.singleFingerPosition.end)
+
           if (this.isMagnifying(dom) && !this.iscloseingDown) { // 当图片放大时提供滑动功能
             this.zoomInSlide(dom.children[0])
           } else if (!this.pageTurning && this.isSingleTouch) { // 当图片未放大时提供下滑动关闭
@@ -366,20 +374,36 @@ export default {
           this.currentScale = this.endScale
           // 清除滑动参数的临时数据
           this.temporaryMoveData.lastScale = 0
+          // 判断放大后的图片是否超出上下左右的边界及其距离
+          this.isOverTheEdge(dom.children[0])
         } else { // 单指操作时
           if (!this.iscloseingDown) { // 如果图片不是在下滑时关闭的过程中时
-            if (this.isMagnifying(dom)) { // 如果图片被放大了，则提供回弹至边界的功能
-              this.springbackToBorder(dom)
-              setTimeout(() => {
-                dom.style.transitionDuration = '0ms'
-              }, 300)
-            }
-            if (dom.style.transform !== '') {
-              let lastX = dom.style.transform.match(/\(([^)]*)\)/)[1].match(/[^,*px]+/g)[0]
-              let lastY = dom.style.transform.match(/\(([^)]*)\)/)[1].match(/[^,*px]+/g)[1]
-              this.singleFingerPosition.displacement.x = +lastX
-              this.singleFingerPosition.displacement.y = +lastY
-            }
+            let lastX = dom.style.transform.match(/\(([^)]*)\)/)[1].match(/[^,*px]+/g)[0]
+            let lastY = dom.style.transform.match(/\(([^)]*)\)/)[1].match(/[^,*px]+/g)[1]
+            // 如果是快速滑动，则添加一个缓慢减速的过程
+            clearInterval(this.sliderTimer)
+            this.sliderTimer = null
+            // if (this.slideTime < 300) {
+            //   dom.style.transitionDuration = '300ms'
+            //   let x = this.singleFingerPosition.start.pageX - this.singleFingerPosition.end.pageX
+            //   let y = this.singleFingerPosition.start.pageY - this.singleFingerPosition.end.pageY
+            //   let X = dom.style.transform.match(/(?:translate3d\()(-?\d+\.?\d{0,})(?:px)/)[1]
+            //   let Y = dom.style.transform.match(/(?:\s)(-?\d+\.?\d{0,})(?:px,\s)/)[1]
+            //   let scale = dom.style.transform.match(/(?:scale\()(\d\.?\d{0,})(?:\))/)[1]
+            //   dom.style.transform = `translate3d(${+X - x}px,${+Y - y}px,0px) scale(${scale})`
+            //   setTimeout(() => {
+            //     this.springbackToBorder(dom)
+            //   }, 300)
+            // } else {
+            this.springbackToBorder(dom)
+            // }
+            // // 如果图片被放大了，则提供回弹至边界的功能
+            // if (this.isMagnifying(dom)) {
+
+            // }
+            this.slideTime = 0
+            this.singleFingerPosition.displacement.x = +lastX
+            this.singleFingerPosition.displacement.y = +lastY
           } else if (this.iscloseingDown) { // 如果图片是在下滑时关闭的过程中时
             // 如果下滑的时间超过1000ms,则会弹至初始位置，反之则关闭组件
             if (this.operationTimedOut) { // 回弹至初始位置
@@ -410,31 +434,29 @@ export default {
             this.Timer = null
           }
         }
-
-        this.operationTimedOut = false
       }, false)
     },
     // 当图片放大时提供滑动功能
     zoomInSlide (node) {
-      let boundingClientRect = node.getBoundingClientRect()
-      let bottom = this.clientHeight - boundingClientRect.bottom
-      let top = boundingClientRect.top
-      let left = boundingClientRect.left
-      let right = this.clientWidth - boundingClientRect.right
+      // 获取上次滑动的坐标偏移值
       let { x, y } = { ...this.singleFingerPosition.displacement }
-      let Xmoving = x + this.singleFingerPosition.end.pageX - this.singleFingerPosition.start.pageX
-      let Ymoving = y + this.singleFingerPosition.end.pageY - this.singleFingerPosition.start.pageY
-      if (bottom > 0 && top > 0) { // 当放大后，图片上下部分未被遮挡时，不产生上下滑动
-        this.isOver.vertical = false
-        Ymoving = y
-      } else {
-        this.isOver.vertical = true
+      let Xmoving = x
+      let Ymoving = y
+      if (this.isOver.vertical) { // 当放大后，只有图片上下部分被遮挡时才产生上下滑动
+        Ymoving = y + this.singleFingerPosition.end.pageY - this.singleFingerPosition.start.pageY
+        if (Math.abs(Ymoving) > this.isOver.verticalValue) {
+          // 滑动到边界后产生阻尼曲线
+          let dir = Ymoving / Math.abs(Ymoving)
+          Ymoving = (this.isOver.verticalValue + this.dampingFunction(Math.abs(Ymoving) - this.isOver.verticalValue)) * dir
+        }
       }
-      if (left > 0 && right > 0) { // 当放大后，图片上下部分未被遮挡时，不产生上下滑动
-        this.isOver.level = false
-        Xmoving = x
-      } else {
-        this.isOver.level = true
+      if (this.isOver.level) { // 当放大后，只有图片左右部分被遮挡时才产生上下滑动
+        Xmoving = x + this.singleFingerPosition.end.pageX - this.singleFingerPosition.start.pageX
+        if (Math.abs(Xmoving) > this.isOver.levelValue) {
+          // 滑动到边界后产生阻尼曲线
+          let dir = Xmoving / Math.abs(Xmoving)
+          Xmoving = (this.isOver.levelValue + this.dampingFunction(Math.abs(Xmoving) - this.isOver.levelValue)) * dir
+        }
       }
       let scale = node.parentNode.style.transform.match(/(?:scale\()(\d\.?\d{0,})(?:\))/)[0]
       node.parentNode.style.transform = `translate3d(${Xmoving}px, ${Ymoving}px, 0px) ${scale}`
@@ -453,24 +475,45 @@ export default {
       if (node.style.transform !== '') {
         lastX = node.style.transform.match(/(?:translate3d\()(-?\d+\.?\d{0,})(?:px)/)[1]
         lastY = node.style.transform.match(/(?:\s)(-?\d+\.?\d{0,})(?:px,\s)/)[1]
-        this.debugInfo = '222'
       }
       let leftDistance = left < 0 ? 0 : left
       let rightDistance = right < 0 ? 0 : right
       let topDistance = top < 0 ? 0 : top
       let bottomDistance = bottom < 0 ? 0 : bottom
+      // 开启回弹动画
+      node.style.transitionDuration = '350ms'
       // 当图片被放大时，其是否超出了屏幕的上下边框，超出了才可以上下移动,此处是为了清除其细微的偏移量
       if (!this.isOver.vertical) {
-        node.style.transitionDuration = '300ms'
         bottomDistance = (bottom - top) / 2
         topDistance = 0
       } else if (!this.isOver.level) {
-        node.style.transitionDuration = '300ms'
         leftDistance = (left - right) / 2
         rightDistance = 0
       }
       let scale = node.style.transform.match(/(?:scale\()(\d\.?\d{0,})(?:\))/)[1]
       node.style.transform = `translate3d(${+lastX + rightDistance - leftDistance}px,${+lastY + bottomDistance - topDistance}px,0px) scale(${Math.round(scale * 100) / 100})`
+    },
+    // 判断图片放大后是否上、下、左、右超过边界
+    isOverTheEdge (node) {
+      let boundingClientRect = node.getBoundingClientRect()
+      let bottom = this.clientHeight - boundingClientRect.bottom
+      let top = boundingClientRect.top
+      let left = boundingClientRect.left
+      let right = this.clientWidth - boundingClientRect.right
+      if (bottom > 0 && top > 0) { // 当放大后，图片上下部分未被遮挡时，不产生上下滑动
+        this.isOver.vertical = false
+        this.isOver.verticalValue = 0
+      } else {
+        this.isOver.vertical = true
+        this.isOver.verticalValue = Math.abs(bottom)
+      }
+      if (left > 0 && right > 0) { // 当放大后，图片上下部分未被遮挡时，不产生上下滑动
+        this.isOver.level = false
+        this.isOver.levelValue = 0
+      } else {
+        this.isOver.level = true
+        this.isOver.levelValue = Math.abs(left)
+      }
     },
     // 单指下滑关闭SLIDESHOW功能
     downSlideToClose (node) {
@@ -558,6 +601,14 @@ export default {
       let toTop = Math.ceil(endBoundingClientRect.top - boundingClientRect.top)
       let toLeft = Math.ceil(endBoundingClientRect.left - boundingClientRect.left)
       return `translate3d(${toLeft - 1 + fixedDisplacementX}px,${toTop + fixedDisplacementY}px,0px) scale(1)`
+    },
+    dampingFunction (X) { // 阻尼函数
+      const A = 833.100114536909
+      const B = -0.98500289542665
+      const C = 1775.09591318241
+      const D = -0.133922492277198
+      let Y = (A - D) / (1 + Math.pow((X / C), B)) + D
+      return Y
     }
   }
 }
